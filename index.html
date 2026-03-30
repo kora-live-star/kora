@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>كورة لايف | بث مباشر للمباريات</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: { dark: '#0f0f11', card: '#18181b', primary: '#e11d48' }
+                    },
+                    fontFamily: { ar: ['Tajawal', 'sans-serif'], en: ['Roboto', 'sans-serif'] }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body { background-color: #0f0f11; color: #f4f4f5; font-family: 'Tajawal', sans-serif; transition: all 0.3s ease; }
+        body[dir="ltr"] { font-family: 'Roboto', sans-serif; }
+        .match-card { transition: all 0.3s ease; border: 1px solid #27272a; }
+        .match-card:hover { transform: translateY(-3px); border-color: #e11d48; box-shadow: 0 10px 25px -5px rgba(225, 29, 72, 0.1); }
+        .live-dot { width: 8px; height: 8px; background-color: #ef4444; border-radius: 50%; animation: pulse-red 1.5s infinite; }
+        @keyframes pulse-red { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); } 70% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
+        #player-modal { display: none; backdrop-filter: blur(8px); }
+        #player-modal.active { display: flex; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        html, body { overflow-x: hidden; }
+        .nav-tab { transition: all 0.2s ease; cursor: pointer; }
+    </style>
+</head>
+<body class="antialiased min-h-screen pb-12">
+
+    <nav class="bg-brand-card border-b border-gray-800 sticky top-0 z-40 shadow-lg">
+        <div class="container mx-auto px-3 sm:px-4 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <a href="#" class="flex items-center gap-2 group" onclick="changeDay('today')">
+                    <div class="bg-brand-primary text-white p-1.5 sm:p-2 rounded-lg group-hover:bg-red-700 transition">
+                        <i class="fa-solid fa-play text-sm sm:text-base"></i>
+                    </div>
+                    <span class="text-xl sm:text-2xl font-black tracking-tight" data-i18n="brand_part1">بين<span class="text-brand-primary" data-i18n="brand_part2">ماتش</span></span>
+                </a>
+
+                <div class="hidden md:flex items-center space-s-6 font-bold text-gray-300 mx-4">
+                    <a id="tab-today" onclick="changeDay('today')" class="nav-tab text-brand-primary border-b-2 border-brand-primary pb-1 px-3" data-i18n="nav_today">مباريات اليوم</a>
+                    <a id="tab-yesterday" onclick="changeDay('yesterday')" class="nav-tab hover:text-white px-3 border-b-2 border-transparent pb-1" data-i18n="nav_yesterday">الأمس</a>
+                    <a id="tab-tomorrow" onclick="changeDay('tomorrow')" class="nav-tab hover:text-white px-3 border-b-2 border-transparent pb-1" data-i18n="nav_tomorrow">الغد</a>
+                </div>
+
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <button onclick="toggleLanguage()" class="text-gray-300 hover:text-white bg-gray-800 hover:bg-gray-700 px-3 py-1.5 rounded-md text-xs sm:text-sm font-bold flex items-center gap-1.5 transition border border-gray-700">
+                        <i class="fa-solid fa-globe"></i>
+                        <span id="lang-text">EN</span>
+                    </button>
+                    <button onclick="loadData()" class="text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 px-3 py-1.5 rounded-md text-xs sm:text-sm font-bold flex items-center gap-1.5 transition border border-gray-700">
+                        <i class="fa-solid fa-rotate-right"></i>
+                        <span class="hidden sm:inline" data-i18n="btn_refresh">تحديث</span>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="flex md:hidden justify-center items-center font-bold text-gray-300 border-t border-gray-800 py-2 text-sm gap-4">
+                <a id="tab-mobile-today" onclick="changeDay('today')" class="nav-tab text-brand-primary border-b-2 border-brand-primary pb-1 px-2" data-i18n="nav_today">اليوم</a>
+                <a id="tab-mobile-yesterday" onclick="changeDay('yesterday')" class="nav-tab hover:text-white px-2 border-b-2 border-transparent pb-1" data-i18n="nav_yesterday">الأمس</a>
+                <a id="tab-mobile-tomorrow" onclick="changeDay('tomorrow')" class="nav-tab hover:text-white px-2 border-b-2 border-transparent pb-1" data-i18n="nav_tomorrow">الغد</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container mx-auto mt-6 sm:mt-8 px-3 sm:px-4 lg:px-8 max-w-6xl">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 bg-brand-card p-4 rounded-xl border border-gray-800 gap-3">
+            <h2 class="text-lg sm:text-xl font-bold flex items-center gap-2 border-s-4 border-brand-primary ps-3">
+                <i id="page-icon" class="fa-solid fa-calendar-day text-brand-primary"></i>
+                <span id="page-title" data-i18n="page_title_today">أهم مباريات اليوم</span>
+            </h2>
+            <div class="text-xs sm:text-sm text-gray-400 bg-gray-800 px-3 py-1 rounded-full border border-gray-700 w-full sm:w-auto text-center">
+                <span id="date-display"></span>
+            </div>
+        </div>
+
+        <div id="matches-container" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
+            <div class="col-span-full text-center py-20 bg-brand-card rounded-xl border border-gray-800 shadow-sm">
+                <i class="fa-solid fa-spinner fa-spin text-3xl sm:text-4xl text-brand-primary mb-4"></i>
+                <p class="text-base sm:text-lg font-bold text-gray-300" data-i18n="loading">جاري جلب جدول المباريات...</p>
+            </div>
+        </div>
+    </main>
+
+    <div id="player-modal" class="fixed inset-0 bg-black/95 z-50 flex-col items-center justify-center p-0 sm:p-4">
+        <div class="w-full max-w-5xl bg-brand-card sm:rounded-t-xl border-b border-gray-800 p-3 sm:p-4 flex flex-wrap justify-between items-center gap-3">
+            <h2 class="text-base sm:text-xl font-bold text-white flex items-center gap-2 w-full sm:w-auto truncate">
+                <i class="fa-solid fa-tv text-brand-primary"></i>
+                <span id="player-title-text" class="truncate">البث المباشر</span>
+            </h2>
+            <div class="flex gap-2 w-full sm:w-auto justify-end">
+                <a id="external-link" href="#" target="_blank" class="bg-gray-800 hover:bg-gray-700 text-white px-3 sm:px-4 py-2 rounded-lg font-bold text-xs sm:text-sm transition flex items-center gap-2 border border-gray-600 flex-1 sm:flex-none justify-center">
+                    <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                    <span data-i18n="btn_ext_server">سيرفر خارجي</span>
+                </a>
+                <button onclick="closePlayer()" class="bg-brand-primary hover:bg-red-700 text-white px-3 sm:px-4 py-2 rounded-lg font-bold text-xs sm:text-sm transition flex items-center gap-2 flex-1 sm:flex-none justify-center">
+                    <i class="fa-solid fa-xmark"></i>
+                    <span data-i18n="btn_close">إغلاق</span>
+                </button>
+            </div>
+        </div>
+        
+        <div class="w-full max-w-5xl ad-warning px-3 sm:px-4 py-2.5 bg-yellow-900/30 border-y sm:border-x border-gray-800 flex items-start gap-2 text-[11px] sm:text-sm">
+            <i class="fa-solid fa-triangle-exclamation text-yellow-500 mt-0.5"></i>
+            <p class="text-gray-300 leading-tight">
+                <strong class="text-yellow-400" data-i18n="alert_title">تنبيه:</strong> 
+                <span data-i18n="alert_desc">أغلق أي نوافذ إعلانية تفتح لك عند الضغط على التشغيل، ثم عُد للفيديو للتشغيل.</span>
+            </p>
+        </div>
+        
+        <div class="w-full max-w-5xl aspect-video bg-black sm:rounded-b-xl overflow-hidden shadow-2xl border border-gray-800 border-t-0 relative h-full sm:h-auto max-h-[70vh]">
+            <iframe id="video-frame" class="w-full h-full absolute top-0 left-0" allowfullscreen="true" scrolling="no" frameborder="0" allow="encrypted-media"></iframe>
+        </div>
+    </div>
+
+    <script>
+        const translations = {
+            ar: {
+                brand_part1: "بين", brand_part2: "ماتش",
+                nav_today: "اليوم", nav_yesterday: "الأمس", nav_tomorrow: "الغد",
+                btn_refresh: "تحديث", page_title_today: "أهم مباريات اليوم",
+                page_title_yesterday: "مباريات الأمس", page_title_tomorrow: "مباريات الغد",
+                loading: "جاري جلب جدول المباريات...", no_matches: "لا توجد مباريات متاحة حالياً",
+                no_streams_past: "روابط البث غير متوفرة لمباريات الأمس.",
+                no_streams_future: "جدول الغد وروابط البث سيتم توفيرها في يوم المباراة.",
+                status_live: "مباشر الآن", status_finished: "انتهت", status_soon: "لم تبدأ",
+                commentator_unknown: "غير محدد", stream_unavailable: "البث غير متوفر أو لم يبدأ بعد",
+                btn_ext_server: "سيرفر خارجي", btn_close: "إغلاق",
+                alert_title: "تنبيه:", alert_desc: "أغلق أي نوافذ إعلانية تفتح لك عند الضغط على التشغيل، ثم عُد للفيديو للتشغيل."
+            },
+            en: {
+                brand_part1: "Bein", brand_part2: "Match",
+                nav_today: "Today", nav_yesterday: "Yesterday", nav_tomorrow: "Tomorrow",
+                btn_refresh: "Refresh", page_title_today: "Today's Matches",
+                page_title_yesterday: "Yesterday's Matches", page_title_tomorrow: "Tomorrow's Matches",
+                loading: "Loading schedule...", no_matches: "No matches available currently",
+                no_streams_past: "Streams are not available for past matches.",
+                no_streams_future: "Tomorrow's schedule will be available on match day.",
+                status_live: "LIVE NOW", status_finished: "Finished", status_soon: "Upcoming",
+                commentator_unknown: "Unknown", stream_unavailable: "Stream unavailable",
+                btn_ext_server: "External Server", btn_close: "Close",
+                alert_title: "Alert:", alert_desc: "Close any pop-up ads that appear when you click play, then return."
+            }
+        };
+
+        let currentLang = localStorage.getItem('site_lang') || 'ar';
+        let currentDay = 'today'; 
+        let matchesData = [];
+        let streamsData = {};
+
+        function changeDay(day) {
+            currentDay = day;
+            ['today', 'yesterday', 'tomorrow'].forEach(d => {
+                [document.getElementById(`tab-${d}`), document.getElementById(`tab-mobile-${d}`)].forEach(tab => {
+                    if(tab) { tab.classList.remove('text-brand-primary', 'border-brand-primary'); tab.classList.add('text-gray-300', 'border-transparent'); }
+                });
+            });
+            [document.getElementById(`tab-${day}`), document.getElementById(`tab-mobile-${day}`)].forEach(tab => {
+                if(tab) { tab.classList.add('text-brand-primary', 'border-brand-primary'); tab.classList.remove('text-gray-300', 'border-transparent'); }
+            });
+
+            document.getElementById('page-title').innerText = translations[currentLang][`page_title_${day}`];
+            document.getElementById('page-icon').className = 'text-brand-primary ' + (day === 'yesterday' ? 'fa-solid fa-clock-rotate-left' : day === 'tomorrow' ? 'fa-solid fa-calendar-plus' : 'fa-solid fa-calendar-day');
+            updateDateDisplay();
+            renderMatches();
+        }
+
+        function updateDateDisplay() {
+            let dateObj = new Date();
+            if (currentDay === 'yesterday') dateObj.setDate(dateObj.getDate() - 1);
+            else if (currentDay === 'tomorrow') dateObj.setDate(dateObj.getDate() + 1);
+            document.getElementById('date-display').innerText = dateObj.toLocaleDateString(currentLang === 'ar' ? 'ar-EG' : 'en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        }
+
+        function applyLanguage() {
+            document.documentElement.lang = currentLang;
+            document.documentElement.dir = currentLang === 'ar' ? 'rtl' : 'ltr';
+            document.getElementById('lang-text').innerText = currentLang === 'ar' ? 'EN' : 'AR';
+            
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if(translations[currentLang][key]) {
+                    if(key === "brand_part1") el.innerHTML = `${translations[currentLang][key]}<span class="text-brand-primary" data-i18n="brand_part2">${translations[currentLang]["brand_part2"]}</span>`;
+                    else if(key !== "brand_part2") el.innerText = translations[currentLang][key];
+                }
+            });
+
+            document.getElementById('page-title').innerText = translations[currentLang][`page_title_${currentDay}`];
+            updateDateDisplay();
+            if(matchesData.length > 0 || currentDay !== 'today') renderMatches();
+        }
+
+        function toggleLanguage() { currentLang = currentLang === 'ar' ? 'en' : 'ar'; localStorage.setItem('site_lang', currentLang); applyLanguage(); }
+
+        async function loadData() {
+            if(currentDay === 'today') {
+                document.getElementById('matches-container').innerHTML = `<div class="col-span-full text-center py-20 bg-brand-card rounded-xl border border-gray-800 shadow-sm"><i class="fa-solid fa-spinner fa-spin text-3xl sm:text-4xl text-brand-primary mb-4"></i><p class="text-base sm:text-lg font-bold text-gray-300">${translations[currentLang].loading}</p></div>`;
+            }
+            try {
+                const noCache = new Date().getTime();
+                const [matchesRes, streamsRes] = await Promise.all([fetch(`matches.json?t=${noCache}`), fetch(`streams.json?t=${noCache}`)]);
+                if (matchesRes.ok && streamsRes.ok) { matchesData = await matchesRes.json(); streamsData = await streamsRes.json(); renderMatches(); }
+            } catch (error) { console.log("Waiting for data..."); }
+        }
+
+        function renderMatches() {
+            const container = document.getElementById('matches-container');
+            const t = translations[currentLang];
+
+            if (currentDay !== 'today') {
+                container.innerHTML = `<div class="col-span-full text-center py-16 sm:py-20 bg-brand-card rounded-xl border border-gray-800"><i class="fa-solid ${currentDay === 'yesterday' ? 'fa-clock-rotate-left' : 'fa-calendar-plus'} text-3xl sm:text-4xl text-gray-600 mb-4"></i><p class="text-base sm:text-lg font-bold text-gray-400">${currentDay === 'yesterday' ? t.no_streams_past : t.no_streams_future}</p></div>`;
+                return;
+            }
+
+            if (matchesData.length === 0) {
+                container.innerHTML = `<div class="col-span-full text-center py-16 sm:py-20 bg-brand-card rounded-xl border border-gray-800"><i class="fa-regular fa-calendar-xmark text-3xl sm:text-4xl text-gray-600 mb-4"></i><p class="text-base sm:text-lg font-bold text-gray-400">${t.no_matches}</p></div>`;
+                return;
+            }
+
+            container.innerHTML = matchesData.map(match => {
+                const isLive = match.status === 'live', isFinished = match.status === 'finished', hasStream = streamsData[match.id] && streamsData[match.id].length > 0;
+                let centerDisplay = `<div class="text-xl sm:text-2xl md:text-3xl font-black bg-gray-800 px-3 sm:px-4 py-1 rounded-lg text-white border border-gray-700 shadow-inner tracking-widest">${match.time}</div>`;
+                if (isFinished && match.result) centerDisplay = `<div class="text-xl sm:text-2xl md:text-3xl font-black bg-gray-800 px-3 sm:px-4 py-1 rounded-lg text-brand-primary border border-gray-700 shadow-inner tracking-widest">${match.result}</div><div class="text-[10px] sm:text-xs text-gray-400 mt-1.5 font-bold">${t.status_finished}</div>`;
+                else if (isLive) centerDisplay = `<div class="live-indicator mb-1 sm:mb-2"><div class="live-dot"></div><span class="text-brand-primary font-bold text-[10px] sm:text-xs">${t.status_live}</span></div><div class="text-xl sm:text-2xl md:text-3xl font-black text-white tracking-widest" dir="ltr">${match.result || '0 - 0'}</div>`;
+
+                return `<div class="match-card bg-brand-card rounded-xl overflow-hidden flex flex-col relative group cursor-pointer" ${hasStream ? `onclick="openPlayer('${match.id}', '${match.team1} vs ${match.team2}')"` : ''}>
+                    <div class="bg-gray-800/50 py-1.5 sm:py-2 px-3 sm:px-4 border-b border-gray-800 text-center text-[11px] sm:text-xs font-bold text-gray-300 flex justify-center items-center gap-1.5 truncate"><i class="fa-solid fa-trophy text-yellow-500 text-[10px] sm:text-xs"></i><span class="truncate">${match.league}</span></div>
+                    <div class="flex flex-row justify-between items-center p-3 sm:p-5 h-28 sm:h-32">
+                        <div class="flex flex-col items-center w-[35%] text-center px-1"><img src="${match.logo1}" alt="${match.team1}" class="w-10 h-10 sm:w-14 sm:h-14 object-contain mb-1.5 sm:mb-2 drop-shadow-lg" onerror="this.src='https://via.placeholder.com/64?text=Club'"><h3 class="font-bold text-[11px] sm:text-sm text-white line-clamp-2 leading-tight">${match.team1}</h3></div>
+                        <div class="flex flex-col items-center justify-center w-[30%] text-center">${centerDisplay}</div>
+                        <div class="flex flex-col items-center w-[35%] text-center px-1"><img src="${match.logo2}" alt="${match.team2}" class="w-10 h-10 sm:w-14 sm:h-14 object-contain mb-1.5 sm:mb-2 drop-shadow-lg" onerror="this.src='https://via.placeholder.com/64?text=Club'"><h3 class="font-bold text-[11px] sm:text-sm text-white line-clamp-2 leading-tight">${match.team2}</h3></div>
+                    </div>
+                    <div class="bg-gray-800/80 py-2 px-3 sm:px-4 flex justify-between items-center text-[10px] sm:text-xs border-t border-gray-800 gap-2"><div class="flex items-center gap-1.5 text-gray-300 truncate"><i class="fa-solid fa-microphone text-blue-400"></i><span class="truncate">${match.commentator || t.commentator_unknown}</span></div><div class="flex items-center gap-1.5 text-gray-300 whitespace-nowrap"><i class="fa-solid fa-tv text-brand-primary"></i><span class="bg-gray-900 px-1.5 sm:px-2 py-0.5 rounded border border-gray-700">${match.commentator || 'Bein Sports'}</span></div></div>
+                    ${!hasStream && !isFinished ? `<div class="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm"><span class="bg-gray-800 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-bold border border-gray-600 text-xs sm:text-sm text-center mx-4">${t.stream_unavailable}</span></div>` : ''}
+                    ${hasStream ? `<div class="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-[2px]"><div class="bg-brand-primary text-white rounded-full w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center text-lg sm:text-xl shadow-[0_0_15px_rgba(225,29,72,0.8)] transform scale-90 group-hover:scale-100 transition-transform"><i class="fa-solid fa-play ${currentLang === 'ar' ? 'ml-1' : 'mr-1'}"></i></div></div>` : ''}
+                </div>`;
+            }).join('');
+        }
+
+        function openPlayer(matchId, title) {
+            const streamInfo = streamsData[matchId];
+            if (streamInfo && streamInfo.length > 0) {
+                const finalUrl = atob(streamInfo[0].url_base64); 
+                document.getElementById('player-title-text').innerText = title;
+                document.getElementById('video-frame').src = finalUrl + "?t=" + new Date().getTime();
+                document.getElementById('external-link').href = finalUrl; 
+                document.getElementById('player-modal').classList.add('active');
+                document.body.style.overflow = 'hidden'; 
+            }
+        }
+
+        function closePlayer() {
+            document.getElementById('player-modal').classList.remove('active');
+            document.getElementById('video-frame').src = ''; 
+            document.body.style.overflow = 'auto';
+        }
+
+        document.getElementById('player-modal').addEventListener('click', function(e) { if (e.target === this) closePlayer(); });
+        applyLanguage(); changeDay('today'); loadData(); setInterval(loadData, 60000);
+    </script>
+</body>
+</html>

@@ -2,7 +2,7 @@ name: Auto Update Matches
 
 on:
   schedule:
-    - cron: '0 * * * *'
+    - cron: '*/30 * * * *' # تحديث كل 30 دقيقة
   workflow_dispatch:
 
 jobs:
@@ -23,7 +23,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install requests beautifulsoup4
 
       - name: Run Scraper Script
         run: python scrape_matches.py
@@ -33,5 +33,5 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "Auto Bot"
           git add matches.json streams.json || true
-          git diff --quiet && git diff --staged --quiet || git commit -m "تحديث المباريات 🚀"
+          git diff --quiet && git diff --staged --quiet || git commit -m "Auto Update Matches"
           git push || true

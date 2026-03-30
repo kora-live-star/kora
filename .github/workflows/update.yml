@@ -2,21 +2,21 @@ name: Auto Update Matches
 
 on:
   schedule:
-    - cron: '*/30 * * * *' # سيعمل كل نصف ساعة
+    - cron: '0 * * * *'
   workflow_dispatch:
 
 jobs:
   scrape-and-update:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # السماح للروبوت بتعديل الملفات
+      contents: write
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.10'
 
@@ -33,5 +33,5 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "Auto Bot"
           git add matches.json streams.json || true
-          git diff --quiet && git diff --staged --quiet || git commit -m "تحديث المباريات وروابط البث 🚀"
+          git diff --quiet && git diff --staged --quiet || git commit -m "تحديث المباريات 🚀"
           git push || true

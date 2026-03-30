@@ -3,133 +3,97 @@ from bs4 import BeautifulSoup
 import json
 import re
 import base64
-import os
+import time
 
-# ==========================================
-# قاعدة بيانات قنوات DaddyLive (رقم السيرفر)
-# تحتوي على جميع قنوات beIN Sports وغيرها
-# ==========================================
-DADDYLIVE_CHANNELS = {
-    "بى ان سبورت 1": "74",
-    "بى ان سبورت 2": "75",
-    "بى ان سبورت 3": "76",
-    "بى ان سبورت 4": "77",
-    "بى ان سبورت 5": "78",
-    "بى ان سبورت 6": "79",
-    "بى ان سبورت 7": "80",
-    "بى ان سبورت 8": "81",
-    "بى ان سبورت 9": "82",
-    "بى ان سبورت الاخبارية": "83",
-    "بى ان سبورت المفتوحة": "84",
-    "بى ان سبورت afc": "85",
-    "بى ان سبورت afc 1": "85",
-    "بى ان سبورت afc 2": "86",
-    "بى ان سبورت afc 3": "87",
-    "بى ان سبورت اكسترا 1": "88",
-    "بى ان سبورت اكسترا 2": "89",
-    "بى ان سبورت xtra 1": "88",
-    "بى ان سبورت xtra 2": "89",
-    "بى ان سبورت الانجليزية 1": "90",
-    "بى ان سبورت الانجليزية 2": "91",
-    "بى ان سبورت الفرنسية 1": "92",
-    "ssc sport 1": "111",
-    "ssc sport 2": "112",
-    "ssc sport 3": "113",
-    "ssc extra 1": "114",
-    "الكاس 1": "121",
-    "الكاس 2": "122",
-    "ابو ظبى الرياضية": "120",
-    "ufc": "150",
-    "espn": "43",
-    "espn+": "44",
-    "tnt sports 1": "55"
+# المصادر القوية (إذا تعطل واحد يعمل الآخر)
+SOURCES = [
+    "https://www.bein-match.fit",
+    "https://kooora4life.com",
+    "https://live.yalla-shoot-arabia.com"
+]
+
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+    "Referer": "https://www.google.com/"
 }
 
-DADDYLIVE_DOMAIN = "https://dlhd.so/embed/stream-"
+def clean_name(name):
+    return name.replace('شعار', '').replace('مباراة', '').replace('بث مباشر', '').strip()
 
-def get_live_matches():
-    print("🚀 جاري سحب المباريات من الموقع المصدر...")
-    URL = "https://www.yallakora.com/match-center"
-    HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
+def scrape():
+    final_matches = []
+    final_streams = {}
+    
+    for url in SOURCES:
+        print(f"📡 محاولة السحب من: {url}")
+        try:
+            session = requests.Session()
+            response = session.get(url, headers=HEADERS, timeout=20)
+            response.encoding = 'utf-8'
+            if response.status_code != 200: continue
+            
+            soup = BeautifulSoup(response.text, 'html.parser')
+            # البحث عن البطاقات
+            match_cards = soup.find_all('a', href=re.compile(r'/match/|/video/|html$'))
+            
+            if not match_cards: continue
 
-    try:
-        response = requests.get(URL, headers=HEADERS, timeout=15)
-        response.encoding = 'utf-8'
-        soup = BeautifulSoup(response.text, 'html.parser')
-        
-        all_matches = []
-        all_streams = {} 
-        match_cards = soup.select('.matchCard') 
-        
-        for card in match_cards:
-            try:
-                # استخراج أسماء الفرق والشعارات والتوقيت
-                team1 = card.select_one('.teamA p').text.strip()
-                team2 = card.select_one('.teamB p').text.strip()
-                logo1 = card.select_one('.teamA img')['src']
-                logo2 = card.select_one('.teamB img')['src']
-                match_time = card.select_one('.time').text.strip()
-                
-                # توليد ID مميز للمباراة
-                clean_id = re.sub(r'\W+', '_', f"{team1}_vs_{team2}").lower()
+            for card in match_cards:
+                try:
+                    m_url = card['href']
+                    if not m_url.startswith('http'): m_url = url.rstrip('/') + '/' + m_url.lstrip('/')
+                    
+                    # استخراج الأسماء
+                    imgs = card.find_all('img')
+                    if len(imgs) >= 2:
+                        t1 = clean_name(imgs[0].get('alt', 'فريق 1'))
+                        t2 = clean_name(imgs[1].get('alt', 'فريق 2'))
+                        l1, l2 = imgs[0].get('src', ''), imgs[1].get('src', '')
+                    else: continue
 
-                # استخراج اسم القناة
-                channel_div = card.select_one('.channel')
-                channel_name = channel_div.text.strip() if channel_div else "غير محدد"
+                    m_id = re.sub(r'\W+', '_', f"{t1}_vs_{t2}").lower()
+                    
+                    # الوقت والنتيجة
+                    time_txt = card.find(string=re.compile(r'\d{1,2}:\d{2}'))
+                    m_time = time_txt.strip() if time_txt else "00:00"
+                    
+                    status = "soon"
+                    c_html = str(card).lower()
+                    if any(x in c_html for x in ["مباشر", "live", "الان"]): status = "live"
+                    elif any(x in c_html for x in ["انتهت", "finished"]): status = "finished"
 
-                # تحديد حالة المباراة
-                status_text = card.select_one('.matchStatus span').text.strip() if card.select_one('.matchStatus') else ""
-                status = "soon"
-                if "جارية" in status_text or "مباشر" in status_text:
-                    status = "live"
-                elif "انتهت" in status_text:
-                    status = "finished"
+                    # سحب الروابط (دخول صفحة المباراة)
+                    streams = []
+                    if status != "finished":
+                        print(f"   🔗 فحص الروابط لـ: {t1}")
+                        time.sleep(1)
+                        m_page = session.get(m_url, headers=HEADERS, timeout=10)
+                        m_soup = BeautifulSoup(m_page.text, 'html.parser')
+                        for iframe in m_soup.find_all('iframe'):
+                            src = iframe.get('src') or iframe.get('data-src')
+                            if src and 'http' in src and 'ads' not in src.lower():
+                                if src.startswith('//'): src = 'https:' + src
+                                b64 = base64.b64encode(src.encode()).decode()
+                                streams.append({"name": "Server HD", "url_base64": b64})
 
-                # حفظ بيانات المباراة
-                match_entry = {
-                    "id": clean_id,
-                    "team1": team1,
-                    "team2": team2,
-                    "logo1": logo1,
-                    "logo2": logo2,
-                    "time": match_time,
-                    "status": status,
-                    "league": "بطولة اليوم",
-                    "commentator": channel_name 
-                }
-                all_matches.append(match_entry)
-                
-                # البحث عن القناة في القاموس لتوليد رابط البث
-                stream_number = None
-                for key, val in DADDYLIVE_CHANNELS.items():
-                    if key in channel_name.lower():
-                        stream_number = val
-                        break
-                
-                # توليد وتشفير الرابط إذا وجدنا القناة
-                if stream_number:
-                    embed_url = f"{DADDYLIVE_DOMAIN}{stream_number}.php"
-                    encoded_url = base64.b64encode(embed_url.encode('utf-8')).decode('utf-8')
-                    all_streams[clean_id] = [{"name": f"سيرفر المشاهدة ({channel_name})", "type": "iframe", "url_base64": encoded_url}]
-                else:
-                    all_streams[clean_id] = []
-                
-            except Exception:
-                # تخطي أي مباراة تفشل في التحليل
-                continue
+                    final_matches.append({
+                        "id": m_id, "team1": t1, "team2": t2, "logo1": l1, "logo2": l2,
+                        "time": m_time, "status": status, "league": "الدوريات الكبرى", "commentator": "Bein Sports"
+                    })
+                    final_streams[m_id] = streams
+                    
+                except Exception: continue
+            
+            if final_matches: break # لو نجح مصدر واحد نكتفي به
+            
+        except Exception as e: print(f"❌ خطأ: {e}")
 
-        # حفظ الملفات
-        if all_matches:
-            with open('matches.json', 'w', encoding='utf-8') as f:
-                json.dump(all_matches, f, ensure_ascii=False, indent=4)
-            with open('streams.json', 'w', encoding='utf-8') as f:
-                json.dump(all_streams, f, ensure_ascii=False, indent=4)
-            print(f"✅ تمت العملية بنجاح! تم استخراج {len(all_matches)} مباراة وتوليد الروابط.")
-        else:
-            print("⚠️ لم يتم العثور على مباريات.")
-
-    except Exception as e:
-        print(f"❌ خطأ فني أثناء الاتصال: {e}")
+    with open('matches.json', 'w', encoding='utf-8') as f:
+        json.dump(final_matches, f, ensure_ascii=False, indent=4)
+    with open('streams.json', 'w', encoding='utf-8') as f:
+        json.dump(final_streams, f, ensure_ascii=False, indent=4)
+    print(f"🎉 تم بنجاح! وجدنا {len(final_matches)} مباراة.")
 
 if __name__ == "__main__":
-    get_live_matches()
+    scrape()
